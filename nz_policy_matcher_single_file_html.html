@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NZ Policy Matcher</title>
+  <meta name="description" content="Anonymous NZ party policy matcher. Select the policies you prefer by category and see which parties you align with." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { color-scheme: light; }
+    html { scroll-behavior: smooth; }
+    .policy-card input:checked + div { border-color: #2563eb; background: #eff6ff; }
+    .tab-active { background: #111827; color: white; }
+    .category-active { background: #2563eb; color: white; border-color: #2563eb; }
+    .modal-open { overflow: hidden; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">NZ Policy Matcher</h1>
+        <p class="text-sm text-slate-600">Anonymous policy selection tool for comparing New Zealand political parties.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <button id="tabMatcher" class="tab-active px-4 py-2 rounded-xl border border-slate-300 text-sm font-semibold">Matcher</button>
+        <button id="tabRanking" class="px-4 py-2 rounded-xl border border-slate-300 text-sm font-semibold bg-white">Overall Ranking</button>
+        <button id="resetBtn" class="px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm font-semibold">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <section class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+      <strong>Important:</strong> This is an informational tool only and is not voting advice. Policy wording and party positions change. Always check official party websites before relying on this information.
+    </section>
+
+    <section id="matcherView" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+      <aside class="bg-white border border-slate-200 rounded-2xl p-4 h-fit lg:sticky lg:top-28">
+        <div class="mb-4">
+          <label for="partyScope" class="block text-sm font-semibold mb-2">Party list</label>
+          <select id="partyScope" class="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-sm">
+            <option value="top6">Top 6 parliamentary parties</option>
+            <option value="all">All included parties</option>
+          </select>
+          <p class="mt-2 text-xs text-slate-500">Top 6 currently means National, Labour, Green, ACT, NZ First, and Te Pāti Māori.</p>
+        </div>
+
+        <h2 class="text-sm font-bold uppercase tracking-wide text-slate-500 mb-3">Categories</h2>
+        <div id="categoryButtons" class="flex flex-col gap-2"></div>
+      </aside>
+
+      <section class="min-w-0">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+            <div>
+              <h2 id="categoryTitle" class="text-2xl font-bold"></h2>
+              <p id="categoryDescription" class="text-slate-600 mt-1"></p>
+            </div>
+            <div class="flex gap-2">
+              <button id="confirmBtn" class="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700">Confirm category</button>
+              <button id="clearCategoryBtn" class="px-5 py-2 rounded-xl border border-slate-300 bg-white font-semibold hover:bg-slate-50">Clear</button>
+            </div>
+          </div>
+          <p class="mt-4 text-sm text-slate-500">Select the anonymous policy options you support. Party names reveal only after you confirm the category.</p>
+        </div>
+
+        <div id="policyGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+      </section>
+    </section>
+
+    <section id="rankingView" class="hidden">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+        <h2 class="text-2xl font-bold">Overall Ranking</h2>
+        <p class="text-slate-600 mt-1">Your ranking is based on confirmed policy selections. “Other” policies are recorded separately and do not add points to party percentages.</p>
+      </div>
+      <div id="rankingContent" class="space-y-5"></div>
+    </section>
+  </main>
+
+  <div id="modal" class="hidden fixed inset-0 z-50 bg-black/60 p-4">
+    <div class="max-w-3xl mx-auto mt-10 bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div class="flex justify-between items-start gap-4 border-b border-slate-200 p-5">
+        <div>
+          <h3 id="modalTitle" class="text-xl font-bold"></h3>
+          <p id="modalSub" class="text-sm text-slate-500 mt-1"></p>
+        </div>
+        <button id="modalClose" class="rounded-lg px-3 py-1 border border-slate-300 hover:bg-slate-50">Close</button>
+      </div>
+      <div class="p-5 space-y-4 text-sm leading-6">
+        <div>
+          <h4 class="font-bold">Plain English summary</h4>
+          <p id="modalSummary" class="text-slate-700"></p>
+        </div>
+        <div>
+          <h4 class="font-bold">Official wording / notes</h4>
+          <p id="modalOfficial" class="text-slate-700 whitespace-pre-wrap"></p>
+        </div>
+        <a id="modalSource" href="#" target="_blank" rel="noopener" class="inline-flex items-center rounded-xl bg-slate-900 text-white px-4 py-2 font-semibold">Open official source</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  HOW TO UPDATE THIS SITE
+  1) Add or edit parties in PARTY_META.
+  2) Add policy items in POLICY_DATA.
+  3) Use party: "other" only for policies that are unique/uncategorisable and should not sway party percentages.
+  4) Keep labels neutral and summaries in plain English.
+  5) Paste official wording into officialText after checking each official party source.
+*/
+
+const PARTY_META = {
+  national: { name: "National Party", short: "National", scope: "top6", website: "https://www.national.org.nz/" },
+  labour: { name: "New Zealand Labour Party", short: "Labour", scope: "top6", website: "https://www.labour.org.nz/" },
+  green: { name: "Green Party of Aotearoa New Zealand", short: "Green", scope: "top6", website: "https://www.greens.org.nz/" },
+  act: { name: "ACT New Zealand", short: "ACT", scope: "top6", website: "https://www.act.org.nz/" },
+  nzfirst: { name: "New Zealand First", short: "NZ First", scope: "top6", website: "https://www.nzfirst.nz/" },
+  maori: { name: "Te Pāti Māori", short: "Te Pāti Māori", scope: "top6", website: "https://www.maoriparty.org.nz/" },
+  opportunity: { name: "Opportunity Party", short: "Opportunity", scope: "all", website: "https://www.top.org.nz/" },
+  conservative: { name: "Conservative Party NZ", short: "Conservative", scope: "all", website: "https://www.newconservative.org.nz/" },
+  other: { name: "Other / unique policy", short: "Other", scope: "all", website: "#" }
+};
+
+const CATEGORIES = [
+  { id: "environment", title: "Environment", description: "Climate, biodiversity, conservation, transport emissions, and natural resources." },
+  { id: "justice", title: "Justice & prisons", description: "Crime, corrections, policing, sentencing, rehabilitation, courts, and victims." },
+  { id: "health", title: "Health", description: "Hospitals, primary care, medicines, mental health, disability, and prevention." },
+  { id: "education", title: "Education", description: "Schools, curriculum, attendance, tertiary, vocational pathways, and skills." },
+  { id: "economy", title: "Economy & cost of living", description: "Tax, jobs, wages, productivity, public spending, inflation, and business settings." },
+  { id: "housing", title: "Housing & infrastructure", description: "Housing supply, rentals, planning, transport, water, and major infrastructure." },
+  { id: "immigration", title: "Immigration", description: "Migration settings, skills, settlement, citizenship, and border priorities." },
+  { id: "treaty", title: "Treaty, Māori & democracy", description: "Te Tiriti, Māori representation, public services, equal rights, and constitutional settings." },
+  { id: "other", title: "Other", description: "Policies that do not clearly match across parties or should be kept separate from scoring." }
+];
+
+const POLICY_DATA = [
+  // ENVIRONMENT
+  { id: "env-national-1", category: "environment", party: "national", summary: "Prioritise practical environmental management while balancing climate action with economic growth and infrastructure delivery.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/" },
+  { id: "env-labour-1", category: "environment", party: "labour", summary: "Invest in cleaner energy and climate action while supporting households, jobs, and public services.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/" },
+  { id: "env-green-1", category: "environment", party: "green", summary: "Put climate action, biodiversity protection, and environmental limits at the centre of government decision-making.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "env-act-1", category: "environment", party: "act", summary: "Use market-based and regulatory reform approaches, with less red tape and more focus on practical delivery.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/policies" },
+  { id: "env-nzfirst-1", category: "environment", party: "nzfirst", summary: "Support environmental protections while emphasising national interests, regional communities, and practical resource use.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "env-maori-1", category: "environment", party: "maori", summary: "Frame environmental policy through whakapapa, kaitiakitanga, tino rangatiratanga, and intergenerational wellbeing.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/about-us" },
+
+  // JUSTICE
+  { id: "jus-national-1", category: "justice", party: "national", summary: "Increase consequences for crime, strengthen police powers, focus on gangs, youth offending, and victim rights.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/policies/restoring-law-and-order" },
+  { id: "jus-labour-1", category: "justice", party: "labour", summary: "Focus on safer communities with prevention, rehabilitation, and public services that address drivers of offending.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/our-policies/" },
+  { id: "jus-green-1", category: "justice", party: "green", summary: "Emphasise prevention, rehabilitation, restorative approaches, and reducing harm across the justice system.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "jus-act-1", category: "justice", party: "act", summary: "Emphasise law and order, accountability, victims’ rights, and stronger justice system performance.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/policies" },
+  { id: "jus-nzfirst-1", category: "justice", party: "nzfirst", summary: "Support tougher responses to crime and policies aimed at public safety and community confidence.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/2023_policies" },
+  { id: "jus-maori-1", category: "justice", party: "maori", summary: "Support a long-term shift away from prisons towards solutions that address harm, colonisation, and reoffending drivers.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/if_you_re_not_trying_to_abolish_prisons_in_aotearoa_what_are_you_doing_in_parliament" },
+
+  // HEALTH
+  { id: "hea-national-1", category: "health", party: "national", summary: "Focus on improving health system delivery, targets, workforce, and timely access to services.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/" },
+  { id: "hea-labour-1", category: "health", party: "labour", summary: "Prioritise a quality public health system that supports healthy communities and accessible care.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/news/release-labour-outlines-priorities-of-next-govt/" },
+  { id: "hea-green-1", category: "health", party: "green", summary: "Emphasise equity, prevention, mental health, public services, and wider determinants of wellbeing.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "hea-act-1", category: "health", party: "act", summary: "Promote health system reform focused on access, accountability, outcomes, and efficient use of resources.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/policies" },
+  { id: "hea-nzfirst-1", category: "health", party: "nzfirst", summary: "Support health policies with emphasis on older people, regional access, and core public services.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "hea-maori-1", category: "health", party: "maori", summary: "Prioritise Māori health equity, Te Tiriti obligations, and health services designed for whānau wellbeing.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/te_pati_maori_applauds_health_reform" },
+
+  // EDUCATION
+  { id: "edu-national-1", category: "education", party: "national", summary: "Focus on basics, attendance, achievement, curriculum clarity, and stronger school performance measures.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/" },
+  { id: "edu-labour-1", category: "education", party: "labour", summary: "Support education through public investment, skills, opportunity, and pathways to good jobs.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/" },
+  { id: "edu-green-1", category: "education", party: "green", summary: "Emphasise inclusive, equitable education, learner wellbeing, and removing barriers to participation.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "edu-act-1", category: "education", party: "act", summary: "Focus on parental choice, standards, accountability, attendance, and curriculum performance.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/policies" },
+  { id: "edu-nzfirst-1", category: "education", party: "nzfirst", summary: "Support education policies focused on national identity, core skills, discipline, and practical outcomes.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "edu-maori-1", category: "education", party: "maori", summary: "Support kaupapa Māori education, te reo Māori, equity, and whānau-centred learning pathways.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/about-us" },
+
+  // ECONOMY
+  { id: "eco-national-1", category: "economy", party: "national", summary: "Rebuild the economy through lower inflation, jobs, investment, infrastructure, and cost-of-living relief.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/economy" },
+  { id: "eco-labour-1", category: "economy", party: "labour", summary: "Build a fair economy with secure jobs, decent wages, and action on cost-of-living pressures.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/news/release-labour-outlines-priorities-of-next-govt/" },
+  { id: "eco-green-1", category: "economy", party: "green", summary: "Shift the economy towards climate resilience, fairness, income support, public services, and wellbeing.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "eco-act-1", category: "economy", party: "act", summary: "Reduce regulation and public waste, lower tax pressure, and make it easier for business to grow.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/economy" },
+  { id: "eco-nzfirst-1", category: "economy", party: "nzfirst", summary: "Support economic nationalism, regional development, seniors, and policies focused on New Zealand interests.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "eco-maori-1", category: "economy", party: "maori", summary: "Support economic policy grounded in Māori wellbeing, equity, rangatiratanga, and whānau prosperity.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/about-us" },
+
+  // HOUSING
+  { id: "hou-national-1", category: "housing", party: "national", summary: "Increase housing and infrastructure delivery through planning reform, investment tools, and faster consenting.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/policies/infrastructure-for-the-future" },
+  { id: "hou-labour-1", category: "housing", party: "labour", summary: "Prioritise affordable homes, stronger communities, and a better start for children and families.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/news/release-labour-outlines-priorities-of-next-govt/" },
+  { id: "hou-green-1", category: "housing", party: "green", summary: "Focus on warm, affordable, secure housing and public investment to reduce homelessness and inequality.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "hou-act-1", category: "housing", party: "act", summary: "Use planning, infrastructure, and regulatory reform to increase housing supply and reduce constraints.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/policies" },
+  { id: "hou-nzfirst-1", category: "housing", party: "nzfirst", summary: "Support housing and infrastructure policies with a focus on national interest, regional needs, and practical delivery.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "hou-maori-1", category: "housing", party: "maori", summary: "Prioritise Māori housing, homelessness responses, whenua-based solutions, and whānau wellbeing.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/over_promising_government_under_delivering_for_aotearoa" },
+
+  // IMMIGRATION
+  { id: "imm-national-1", category: "immigration", party: "national", summary: "Use immigration settings to support skills, growth, and labour needs while managing system pressures.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/" },
+  { id: "imm-labour-1", category: "immigration", party: "labour", summary: "Balance migration with good jobs, fair work settings, skills development, and community wellbeing.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/" },
+  { id: "imm-green-1", category: "immigration", party: "green", summary: "Support humane, fair immigration settings, migrant rights, family connection, and inclusive communities.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "imm-act-1", category: "immigration", party: "act", summary: "Welcome migrants who contribute to New Zealand, share democratic values, and support infrastructure needs.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/news/making-immigration-work-for-new-zealand" },
+  { id: "imm-nzfirst-1", category: "immigration", party: "nzfirst", summary: "Take a more restrictive or strongly managed approach to immigration based on national interest and capacity.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "imm-maori-1", category: "immigration", party: "maori", summary: "Approach migration through Te Tiriti, manaakitanga, indigenous rights, and social equity considerations.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/about-us" },
+
+  // TREATY / DEMOCRACY
+  { id: "tre-national-1", category: "treaty", party: "national", summary: "Focus public services on need and delivery while governing within existing constitutional and Treaty settings.", officialText: "Add verified official wording from the party source here.", source: "https://www.national.org.nz/" },
+  { id: "tre-labour-1", category: "treaty", party: "labour", summary: "Support democratic government, public services, and natural resources managed for the benefit of present and future generations.", officialText: "Add verified official wording from the party source here.", source: "https://www.labour.org.nz/about/party-information/" },
+  { id: "tre-green-1", category: "treaty", party: "green", summary: "Support Te Tiriti-based governance, Māori rights, equitable representation, and participatory democracy.", officialText: "Add verified official wording from the party source here.", source: "https://www.greens.org.nz/policy_complete_party" },
+  { id: "tre-act-1", category: "treaty", party: "act", summary: "Remove race-based policies and pursue equal-rights framing across government decisions and legislation.", officialText: "Add verified official wording from the party source here.", source: "https://www.act.org.nz/defending-equal-rights-democracy" },
+  { id: "tre-nzfirst-1", category: "treaty", party: "nzfirst", summary: "Support policies framed around national unity, equal citizenship, and changes to some Treaty-related public settings.", officialText: "Add verified official wording from the party source here.", source: "https://www.nzfirst.nz/policy" },
+  { id: "tre-maori-1", category: "treaty", party: "maori", summary: "Centre Te Tiriti, tino rangatiratanga, Māori representation, and kaupapa tuku iho across public policy.", officialText: "Add verified official wording from the party source here.", source: "https://www.maoriparty.org.nz/about-us" },
+
+  // OTHER / UNIQUE
+  { id: "oth-unique-1", category: "other", party: "other", summary: "Unique or unmatched policies can be placed here so they are visible but do not affect party scoring.", officialText: "Add unique policy wording here. These selections are recorded but excluded from percentage calculations.", source: "#" }
+];
+
+const STORAGE_KEY = "nzPolicyMatcherSelectionsV1";
+let currentCategory = CATEGORIES[0].id;
+let confirmedCategories = new Set();
+let selections = loadSelections();
+let revealCategory = {};
+
+function loadSelections() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveSelections() { localStorage.setItem(STORAGE_KEY, JSON.stringify(selections)); }
+function activeParties() {
+  const scope = document.getElementById("partyScope").value;
+  return Object.entries(PARTY_META)
+    .filter(([id, meta]) => id !== "other" && (scope === "all" || meta.scope === "top6"))
+    .map(([id]) => id);
+}
+function filteredPolicies(categoryId) {
+  const parties = new Set(activeParties());
+  return POLICY_DATA.filter(p => p.category === categoryId && (p.party === "other" || parties.has(p.party)));
+}
+function isSelected(policyId) { return (selections[currentCategory] || []).includes(policyId); }
+function setSelected(policyId, checked) {
+  const list = new Set(selections[currentCategory] || []);
+  checked ? list.add(policyId) : list.delete(policyId);
+  selections[currentCategory] = [...list];
+  saveSelections();
+}
+
+function renderCategories() {
+  const wrap = document.getElementById("categoryButtons");
+  wrap.innerHTML = "";
+  CATEGORIES.forEach(cat => {
+    const selectedCount = (selections[cat.id] || []).length;
+    const btn = document.createElement("button");
+    btn.className = `text-left rounded-xl border px-3 py-3 text-sm font-semibold ${cat.id === currentCategory ? "category-active" : "bg-white border-slate-300 hover:bg-slate-50"}`;
+    btn.innerHTML = `<span>${cat.title}</span>${selectedCount ? `<span class="ml-2 text-xs opacity-80">${selectedCount} selected</span>` : ""}`;
+    btn.onclick = () => { currentCategory = cat.id; renderAll(); };
+    wrap.appendChild(btn);
+  });
+}
+
+function renderPolicies() {
+  const cat = CATEGORIES.find(c => c.id === currentCategory);
+  document.getElementById("categoryTitle").textContent = cat.title;
+  document.getElementById("categoryDescription").textContent = cat.description;
+  const grid = document.getElementById("policyGrid");
+  const policies = shuffleStable(filteredPolicies(currentCategory));
+  const revealed = revealCategory[currentCategory] || confirmedCategories.has(currentCategory);
+  grid.innerHTML = "";
+
+  if (!policies.length) {
+    grid.innerHTML = `<div class="col-span-full rounded-2xl bg-white border border-slate-200 p-6 text-slate-600">No policies have been added for this category and party scope yet.</div>`;
+    return;
+  }
+
+  policies.forEach((p, idx) => {
+    const label = revealed ? PARTY_META[p.party].short : `Policy option ${idx + 1}`;
+    const card = document.createElement("label");
+    card.className = "policy-card cursor-pointer block";
+    card.innerHTML = `
+      <input type="checkbox" class="sr-only" ${isSelected(p.id) ? "checked" : ""} />
+      <div class="h-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div class="text-xs uppercase tracking-wide text-slate-500 font-bold">${escapeHtml(label)}</div>
+            <h3 class="mt-1 text-base font-bold">${escapeHtml(p.summary)}</h3>
+          </div>
+          <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">${escapeHtml(cat.title)}</span>
+        </div>
+        <div class="flex items-center justify-between gap-3 mt-4">
+          <span class="text-sm font-semibold text-blue-700">${isSelected(p.id) ? "Selected" : "Select"}</span>
+          <button type="button" class="infoBtn rounded-lg border border-slate-300 px-3 py-1 text-sm font-semibold hover:bg-slate-50" data-id="${p.id}">i</button>
+        </div>
+      </div>`;
+    const checkbox = card.querySelector("input");
+    checkbox.addEventListener("change", e => { setSelected(p.id, e.target.checked); renderAll(); });
+    card.querySelector(".infoBtn").addEventListener("click", e => { e.preventDefault(); openPolicyModal(p, revealed); });
+    grid.appendChild(card);
+  });
+}
+
+function renderRanking() {
+  const wrap = document.getElementById("rankingContent");
+  const totals = calculateScores();
+  const rows = Object.entries(totals.partyScores)
+    .map(([party, points]) => ({ party, points, percent: totals.maxScore ? Math.round((points / totals.maxScore) * 100) : 0 }))
+    .sort((a, b) => b.percent - a.percent || b.points - a.points);
+
+  if (!totals.maxScore) {
+    wrap.innerHTML = `<div class="rounded-2xl bg-white border border-slate-200 p-6 text-slate-600">No confirmed scored selections yet. Go to a category, choose policies, and click Confirm category.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="rounded-2xl bg-white border border-slate-200 p-5">
+        <div class="text-sm text-slate-500 font-semibold">Scored selections</div>
+        <div class="text-3xl font-bold mt-1">${totals.scoredSelections}</div>
+      </div>
+      <div class="rounded-2xl bg-white border border-slate-200 p-5">
+        <div class="text-sm text-slate-500 font-semibold">Other selections</div>
+        <div class="text-3xl font-bold mt-1">${totals.otherSelections}</div>
+      </div>
+      <div class="rounded-2xl bg-white border border-slate-200 p-5">
+        <div class="text-sm text-slate-500 font-semibold">Confirmed categories</div>
+        <div class="text-3xl font-bold mt-1">${confirmedCategories.size}</div>
+      </div>
+    </div>
+    <div class="rounded-2xl bg-white border border-slate-200 overflow-hidden">
+      ${rows.map((r, i) => rankingRow(r, i)).join("")}
+    </div>
+    <div class="rounded-2xl bg-white border border-slate-200 p-5">
+      <h3 class="text-xl font-bold mb-3">Matched policies by party</h3>
+      ${rows.map(r => matchedPoliciesBlock(r.party)).join("")}
+    </div>
+  `;
+}
+
+function rankingRow(r, i) {
+  const meta = PARTY_META[r.party];
+  const topBadge = i < 3 ? `<span class="text-xs font-bold rounded-full bg-blue-100 text-blue-700 px-2 py-1">Top ${i + 1}</span>` : "";
+  return `
+    <div class="p-5 border-b border-slate-200 last:border-b-0">
+      <div class="flex items-center justify-between gap-4 mb-2">
+        <div class="flex items-center gap-3"><h3 class="text-lg font-bold">${escapeHtml(meta.name)}</h3>${topBadge}</div>
+        <div class="text-xl font-bold">${r.percent}%</div>
+      </div>
+      <div class="h-3 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-blue-600" style="width:${r.percent}%"></div></div>
+      <p class="text-sm text-slate-500 mt-2">${r.points} matched selection${r.points === 1 ? "" : "s"}</p>
+    </div>`;
+}
+
+function matchedPoliciesBlock(party) {
+  const matches = Object.entries(selections).flatMap(([catId, ids]) => {
+    if (!confirmedCategories.has(catId)) return [];
+    return ids.map(id => POLICY_DATA.find(p => p.id === id)).filter(p => p && p.party === party);
+  });
+  if (!matches.length) return "";
+  return `
+    <details class="border-t border-slate-200 py-3">
+      <summary class="cursor-pointer font-bold">${escapeHtml(PARTY_META[party].name)} — ${matches.length} matched polic${matches.length === 1 ? "y" : "ies"}</summary>
+      <ul class="mt-3 space-y-2 list-disc pl-5 text-sm text-slate-700">
+        ${matches.map(p => `<li><strong>${escapeHtml(categoryName(p.category))}:</strong> ${escapeHtml(p.summary)} <a class="text-blue-700 underline" href="${p.source}" target="_blank" rel="noopener">Source</a></li>`).join("")}
+      </ul>
+    </details>`;
+}
+
+function calculateScores() {
+  const partyScores = Object.fromEntries(activeParties().map(p => [p, 0]));
+  let scoredSelections = 0;
+  let otherSelections = 0;
+  Object.entries(selections).forEach(([catId, ids]) => {
+    if (!confirmedCategories.has(catId)) return;
+    ids.forEach(id => {
+      const p = POLICY_DATA.find(x => x.id === id);
+      if (!p) return;
+      if (p.party === "other") { otherSelections++; return; }
+      if (partyScores[p.party] !== undefined) {
+        partyScores[p.party]++;
+        scoredSelections++;
+      }
+    });
+  });
+  return { partyScores, scoredSelections, otherSelections, maxScore: scoredSelections || 0 };
+}
+
+function openPolicyModal(policy, revealed) {
+  document.getElementById("modalTitle").textContent = revealed ? PARTY_META[policy.party].name : "Anonymous policy option";
+  document.getElementById("modalSub").textContent = `${categoryName(policy.category)}${revealed ? " • Party revealed" : " • Party hidden until confirm"}`;
+  document.getElementById("modalSummary").textContent = policy.summary;
+  document.getElementById("modalOfficial").textContent = policy.officialText || "Official wording has not been added yet. Use the source link to check the current party policy.";
+  const link = document.getElementById("modalSource");
+  link.href = policy.source || "#";
+  link.style.display = policy.source && policy.source !== "#" ? "inline-flex" : "none";
+  document.getElementById("modal").classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+function closeModal() {
+  document.getElementById("modal").classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+function categoryName(id) { return (CATEGORIES.find(c => c.id === id) || {}).title || id; }
+function escapeHtml(str) { return String(str).replace(/[&<>'"]/g, s => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[s])); }
+function shuffleStable(items) {
+  // Deterministic per category so anonymous ordering does not jump around.
+  return [...items].sort((a,b) => a.id.localeCompare(b.id));
+}
+function persistConfirmed() { localStorage.setItem(STORAGE_KEY + "Confirmed", JSON.stringify([...confirmedCategories])); }
+function loadConfirmed() {
+  try { confirmedCategories = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY + "Confirmed")) || []); }
+  catch { confirmedCategories = new Set(); }
+}
+
+function renderAll() { renderCategories(); renderPolicies(); renderRanking(); }
+
+loadConfirmed();
+document.getElementById("partyScope").addEventListener("change", renderAll);
+document.getElementById("confirmBtn").addEventListener("click", () => {
+  confirmedCategories.add(currentCategory);
+  revealCategory[currentCategory] = true;
+  persistConfirmed();
+  renderAll();
+});
+document.getElementById("clearCategoryBtn").addEventListener("click", () => {
+  selections[currentCategory] = [];
+  saveSelections();
+  renderAll();
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (!confirm("Reset all selections and rankings?")) return;
+  selections = {};
+  confirmedCategories = new Set();
+  revealCategory = {};
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY + "Confirmed");
+  renderAll();
+});
+document.getElementById("tabMatcher").addEventListener("click", () => {
+  document.getElementById("matcherView").classList.remove("hidden");
+  document.getElementById("rankingView").classList.add("hidden");
+  document.getElementById("tabMatcher").classList.add("tab-active");
+  document.getElementById("tabRanking").classList.remove("tab-active");
+});
+document.getElementById("tabRanking").addEventListener("click", () => {
+  document.getElementById("matcherView").classList.add("hidden");
+  document.getElementById("rankingView").classList.remove("hidden");
+  document.getElementById("tabRanking").classList.add("tab-active");
+  document.getElementById("tabMatcher").classList.remove("tab-active");
+  renderRanking();
+});
+document.getElementById("modalClose").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+renderAll();
+</script>
+</body>
+</html>
