@@ -36,6 +36,7 @@
       <div class="flex flex-wrap gap-2 items-center">
         <button id="tabMatcher" class="tab-active px-4 py-2 rounded-2xl border border-slate-300 text-sm font-bold">Matcher</button>
         <button id="tabRanking" class="px-4 py-2 rounded-2xl border border-slate-300 text-sm font-bold bg-white/80">Overall Ranking</button>
+        <button id="updatePoliciesBtn" class="px-4 py-2 rounded-2xl border border-teal-200 bg-teal-50 text-teal-800 text-sm font-bold">Update policies</button>
         <button id="resetBtn" class="px-4 py-2 rounded-2xl border border-red-200 bg-red-50 text-red-700 text-sm font-bold">Reset</button>
       </div>
     </div>
@@ -123,6 +124,7 @@
   4) Keep summaries very plain English.
   5) Paste exact official wording into officialText after checking each official party source.
   6) The site randomises anonymous policy order per browser session, so parties are not always shown in the same order.
+  7) Optional update: create a file called policies.json in the same GitHub repo. The Update policies button will import it.
 */
 
 const PARTY_META = {
@@ -149,7 +151,7 @@ const CATEGORIES = [
   { id: "other", title: "Other", description: "Policies that do not fit neatly into a shared category. These do not change party percentage scores." }
 ];
 
-const POLICY_DATA = [
+const DEFAULT_POLICY_DATA = [
   // ENVIRONMENT
   { id: "env-national-1", category: "environment", party: "national", summary: "Protect the environment, but avoid rules that make farming, building, or business too hard.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.national.org.nz/" },
   { id: "env-labour-1", category: "environment", party: "labour", summary: "Cut pollution and support clean energy, while trying to protect jobs and household costs.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.labour.org.nz/" },
@@ -216,7 +218,27 @@ const POLICY_DATA = [
 
   // OTHER / UNIQUE
   { id: "oth-unique-1", category: "other", party: "other", summary: "A policy that is unique or does not compare fairly with other parties’ policies.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Other policies are saved but excluded from party percentage scoring.", source: "#" }
+  // EXTRA PARTIES FOR THE “ALL INCLUDED PARTIES” TOGGLE
+  { id: "env-top-1", category: "environment", party: "opportunity", summary: "Use practical climate and environmental policy that tries to balance science, fairness, and long-term planning.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "jus-top-1", category: "justice", party: "opportunity", summary: "Reduce crime by dealing with causes like poverty, poor housing, addiction, and lack of opportunity.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "hea-top-1", category: "health", party: "opportunity", summary: "Focus health spending on prevention, mental health, and fixing problems early.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "edu-top-1", category: "education", party: "opportunity", summary: "Make education fairer and more future-focused, with strong support for children and young people.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "eco-top-1", category: "economy", party: "opportunity", summary: "Change tax and income settings so wealth, work, and opportunity are treated more fairly.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "hou-top-1", category: "housing", party: "opportunity", summary: "Make housing more affordable by changing tax, planning, and incentives around land and property.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "imm-top-1", category: "immigration", party: "opportunity", summary: "Use migration settings that support skills, fairness, and long-term planning for communities.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+  { id: "tre-top-1", category: "treaty", party: "opportunity", summary: "Support a democracy that is evidence-based, fair, transparent, and focused on long-term outcomes.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.top.org.nz/" },
+
+  { id: "env-conservative-1", category: "environment", party: "conservative", summary: "Protect the environment while limiting rules seen as costly or unnecessary for households and businesses.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "jus-conservative-1", category: "justice", party: "conservative", summary: "Take a stronger law-and-order approach, with more emphasis on personal responsibility and public safety.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "hea-conservative-1", category: "health", party: "conservative", summary: "Support core health services while giving people and families more choice where possible.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "edu-conservative-1", category: "education", party: "conservative", summary: "Give parents more say in education and put more focus on discipline, basics, and values.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "eco-conservative-1", category: "economy", party: "conservative", summary: "Keep taxes and government spending lower, and support families, work, and local business.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "hou-conservative-1", category: "housing", party: "conservative", summary: "Support home ownership and reduce barriers that make building or buying homes harder.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "imm-conservative-1", category: "immigration", party: "conservative", summary: "Use tighter immigration settings based on New Zealand’s capacity, culture, and public services.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" },
+  { id: "tre-conservative-1", category: "treaty", party: "conservative", summary: "Prefer one law for all citizens and less race-based decision-making in government.", officialText: "PASTE EXACT OFFICIAL WORDING HERE. Do not paraphrase in this field.", source: "https://www.newconservative.org.nz/" }
 ];
+
+let policyData = [...DEFAULT_POLICY_DATA];
 
 const STORAGE_KEY = "nzPolicyMatcherSelectionsV2";
 const ORDER_KEY = "nzPolicyMatcherRandomOrderV2";
@@ -244,7 +266,7 @@ function activeParties() {
 }
 function filteredPolicies(categoryId) {
   const parties = new Set(activeParties());
-  return POLICY_DATA.filter(p => p.category === categoryId && (p.party === "other" || parties.has(p.party)));
+  return policyData.filter(p => p.category === categoryId && (p.party === "other" || parties.has(p.party)));
 }
 function isSelected(policyId) { return (selections[currentCategory] || []).includes(policyId); }
 function setSelected(policyId, checked) {
@@ -362,7 +384,7 @@ function rankingRow(r, i) {
 function matchedPoliciesBlock(party) {
   const matches = Object.entries(selections).flatMap(([catId, ids]) => {
     if (!confirmedCategories.has(catId)) return [];
-    return ids.map(id => POLICY_DATA.find(p => p.id === id)).filter(p => p && p.party === party);
+    return ids.map(id => policyData.find(p => p.id === id)).filter(p => p && p.party === party);
   });
   if (!matches.length) return "";
   return `
@@ -381,7 +403,7 @@ function calculateScores() {
   Object.entries(selections).forEach(([catId, ids]) => {
     if (!confirmedCategories.has(catId)) return;
     ids.forEach(id => {
-      const p = POLICY_DATA.find(x => x.id === id);
+      const p = policyData.find(x => x.id === id);
       if (!p) return;
       if (p.party === "other") { otherSelections++; return; }
       if (partyScores[p.party] !== undefined) {
@@ -399,13 +421,8 @@ function openPolicyModal(policy, revealed) {
   document.getElementById("modalSummary").textContent = policy.summary;
   const officialBox = document.getElementById("officialBox");
   const official = document.getElementById("modalOfficial");
-  if (revealed) {
-    officialBox.classList.remove("hidden");
-    official.textContent = policy.officialText || "Exact official wording has not been added yet. Use the source link to check the current party policy.";
-  } else {
-    officialBox.classList.add("hidden");
-    official.textContent = "";
-  }
+  officialBox.classList.remove("hidden");
+  official.textContent = policy.officialText || "Exact official wording has not been added yet. Paste the party's exact wording into the officialText field.";
   const link = document.getElementById("modalSource");
   link.href = policy.source || "#";
   link.textContent = revealed ? "Open official source" : "Source hidden until confirm";
@@ -461,6 +478,27 @@ document.getElementById("clearCategoryBtn").addEventListener("click", () => {
   saveSelections();
   renderAll();
 });
+document.getElementById("updatePoliciesBtn").addEventListener("click", async () => {
+  try {
+    const response = await fetch("./policies.json?cacheBust=" + Date.now());
+    if (!response.ok) throw new Error("No policies.json file found in this repo.");
+    const imported = await response.json();
+    if (!Array.isArray(imported)) throw new Error("policies.json must be an array of policy objects.");
+    const required = ["id", "category", "party", "summary", "officialText", "source"];
+    const invalid = imported.find(item => !required.every(key => key in item));
+    if (invalid) throw new Error("Every policy needs id, category, party, summary, officialText, and source.");
+    policyData = imported;
+    randomOrder = {};
+    sessionStorage.removeItem(ORDER_KEY);
+    alert("Policies updated from policies.json for this browser session. To make this permanent, keep policies.json in your GitHub repo.");
+    renderAll();
+  } catch (error) {
+    alert("Could not update policies automatically. " + error.message + "
+
+Tip: create a policies.json file in the same repo, or manually edit the policyData inside index.html.");
+  }
+});
+
 document.getElementById("resetBtn").addEventListener("click", () => {
   if (!confirm("Reset all selections and rankings?")) return;
   selections = {};
